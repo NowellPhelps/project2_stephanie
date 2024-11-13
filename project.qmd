@@ -1,4 +1,135 @@
 ---
 title: "Project2"
+df-print: kable
+code-overflow: wrap
+execute: 
+  echo: true
+  warning: false
+  message: false
+editor_options: 
+  chunk_output_type: console
 ---
 
+```{r}
+## load the needed packages
+library(tidyverse)
+library(rvest)
+theme_set(theme_bw())
+
+
+```
+
+**Extract the 2023/2024 English Premier League final standings table from the ESPN website using the `rvest` package**
+
+```{r}
+espn_url <-"https://www.espn.com/soccer/standings/_/league/ENG.1/season/2023"
+
+initial_tables <- read_html(espn_url) %>% 
+  html_table()
+
+initial_tables
+
+```
+
+**Extract the individual tables from the raw tables that were returned**
+
+```{r}
+club_names <- initial_tables[[1]]
+club_names
+
+league_standings <- initial_tables[[2]]
+league_standings
+
+```
+
+**The names in the *club_names* table start with a number and three capital letters which are the club initials hence the club names need to be cleaned.**
+
+```{r}
+## using functions from the stringr package to clean the club names
+
+club_names <-  club_names %>% 
+  mutate(clubs = str_replace_all(`2023-2024`,"\\d+",''),
+         `2023-2024` = NULL) %>% 
+  mutate(clubs = str_sub(clubs,4))
+
+club_names
+```
+
+**The two tables will now be combined to create the complete league standings table**
+
+```{r}
+## using bind_cols() function from the dplyr package to combine the two tables
+
+EPL_table <-  bind_cols(club_names,league_standings)
+EPL_table
+
+## The final table is tidy and requires no furhter cleaning
+```
+
+**Creating new columns**
+
+```{r}
+## creating a new column for points per game and win percentage
+EPL_table <-  EPL_table %>% 
+  mutate(points_pg = P/GP,
+         win_pct = (W/GP)* 100)
+
+EPL_table
+```
+
+**Summary statistics**
+
+```{r}
+## summary statistics of points
+EPL_table %>% 
+  summarise(
+   "Average Points" = mean(P),
+   "Standard Deviation" = sd(P),
+   "Highest Points" = max(P),
+   "Lowest Points" = min(P),
+   "Median Points" = median(P)
+   )
+
+## Win percentage summary statistics
+EPL_table %>% 
+  summarise(
+    "Highest Win Percentage" = max(win_pct),
+    "Lowest Win Percentage" = min(win_pct),
+    "Average Win Percentage" = mean(win_pct)
+  )
+
+```
+
+**Visualization**
+
+```{r}
+#| label: " Points distribution"
+#| fig-cap: "Distribution of points in the  2023-2024 EPL season"
+
+## Distribution of points across teams
+ggplot(EPL_table, aes(x = P)) +
+  geom_histogram(binwidth = 3, fill = "steelblue",color = "black") +
+  labs(title = "Distribution of Points in EPL Standings", x = "Points", y = "Frequency")
+```
+
+```{r}
+#| label: "team attack vs defensive perfromance"
+#| fig-cap: "Scatterplot of goals scored vs goals conceded for each EPL team in the 2023-2024 EPL season"
+
+library(ggrepel)
+
+EPL_table %>% 
+  ggplot(aes(x = A, y = F, label = clubs))+
+  geom_point( color = "steelblue", size = 3)+
+  geom_text_repel(nudge_y = 1, size = 3)+
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "red") +
+  labs(
+    title = "Goals Scored vs Goals Conceded",
+    x = "Goals Conceded",
+    y = "Goals Scored"
+  )
+```
+
+### Summary Report
+
+This is a simple analysis of the 2023-2024 English Premier League final standings. The data used in the analysis was ethically scraped from the ESPN soccer page using various functions in the `rvest` package.The extracted tables were then cleaned and a limited number of summary statistics calculated using various packages from the `tidyverse` metapackage .A total of 38 games were played by each club across the season and the average number of points across all clubs for the season was 52.3(sd = 20.6) points.The highest points accumulated by a team was 91 points while the lowest points was 16 giving a points range of 75 points.The histogram of points distribution showed that majority of teams had points in the 45- 48 range. More than half of the teams (13) conceded more goals than they scored across the entire season which reveals a poor defensive performance across teams in the EPL.The top three teams significantly outperformed the other teams across points accumulated, goals scored and goals conceded.The final league table is only a snapshot hence trends across the season cannot be assessed.Also, dynamics that affect team performance like injury to key players,manager changes etc are not captured.
